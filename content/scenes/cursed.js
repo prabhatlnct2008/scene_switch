@@ -151,18 +151,20 @@
 
   const CROW_SVG =
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 24" ' +
-    'preserveAspectRatio="xMidYMid meet" aria-hidden="true">' +
-    '<path fill="#050505" d="M2 14 Q12 2 20 10 Q26 4 30 12 L30 14 ' +
+    'width="100%" height="100%" preserveAspectRatio="xMidYMid meet" ' +
+    'aria-hidden="true">' +
+    '<path fill="#3a3040" d="M2 14 Q12 2 20 10 Q26 4 30 12 L30 14 ' +
     'Q26 10 20 13 Q12 10 2 16 Z"/>' +
-    '<path fill="#050505" d="M62 14 Q52 2 44 10 Q38 4 34 12 L34 14 ' +
+    '<path fill="#3a3040" d="M62 14 Q52 2 44 10 Q38 4 34 12 L34 14 ' +
     'Q38 10 44 13 Q52 10 62 16 Z"/>' +
-    '<ellipse fill="#050505" cx="32" cy="13" rx="3" ry="1.8"/>' +
-    '<path fill="#050505" d="M35 13 L40 13.5 L35 14 Z"/>' +
+    '<ellipse fill="#3a3040" cx="32" cy="13" rx="3" ry="1.8"/>' +
+    '<path fill="#3a3040" d="M35 13 L40 13.5 L35 14 Z"/>' +
     "</svg>";
 
   const WITCH_SVG =
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 70" ' +
-    'preserveAspectRatio="xMidYMid meet" aria-hidden="true" fill="#050505">' +
+    'width="100%" height="100%" preserveAspectRatio="xMidYMid meet" ' +
+    'aria-hidden="true" fill="#3a3040">' +
     // broom handle
     '<path d="M15 48 L100 36 L100 40 L15 52 Z"/>' +
     // broom bristles (trailing, right side)
