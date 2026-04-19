@@ -1,8 +1,11 @@
 /* Cursed Mode stylesheet. All rules scope to html.scene-switch-scene--cursed
  * so they activate when the engine sets the scene class and inert-out when
- * the class is removed on restore. No animations, no transitions, no
- * flashing — Slice 06 acceptance requires the page to be screenshotable and
- * accessibility-friendly.
+ * the class is removed on restore.
+ *
+ * Motion: crow flocks, a rare witch silhouette, and occasional shadow passes
+ * animate while the scene is active. Everything is pointer-events:none and
+ * cleaned up on restore. The whole motion layer is disabled under
+ * `prefers-reduced-motion: reduce`.
  */
 
 html.scene-switch-scene--cursed {
@@ -58,5 +61,141 @@ html.scene-switch-scene--cursed h3 {
       rgba(0, 0, 0, 0.85) 100%
     ) !important;
   mix-blend-mode: multiply !important;
-  /* No transitions, no animations: the overlay is intentionally static. */
+}
+
+/* --- Motion layer ---------------------------------------------------------
+ * Crows, witches, and shadow passes layer above the vignette (2147481000)
+ * and below the restore pill (2147483000). Each uses transform-only CSS
+ * animations so the compositor handles them without reflow.
+ */
+
+.scene-switch-cursed__crow,
+.scene-switch-cursed__witch,
+.scene-switch-cursed__shadow {
+  all: initial !important;
+  position: fixed !important;
+  pointer-events: none !important;
+  display: block !important;
+  will-change: transform, opacity !important;
+}
+
+/* Crows. Fly left -> right across the upper half of the viewport. The
+ * container handles horizontal travel; the inner .wings element handles
+ * the flap via a quick vertical scale. */
+.scene-switch-cursed__crow {
+  top: 0 !important;
+  left: 0 !important;
+  width: 56px !important;
+  height: 22px !important;
+  z-index: 2147481500 !important;
+  opacity: 0.92 !important;
+  animation-name: ss-cursed-crow-fly !important;
+  animation-timing-function: linear !important;
+  animation-fill-mode: forwards !important;
+  animation-iteration-count: 1 !important;
+}
+
+.scene-switch-cursed__crow > .wings {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  transform-origin: 50% 50% !important;
+  animation: ss-cursed-crow-flap ease-in-out infinite !important;
+}
+
+@keyframes ss-cursed-crow-fly {
+  from {
+    transform: translate3d(-80px, var(--start-top, 10vh), 0);
+  }
+  to {
+    transform: translate3d(calc(100vw + 80px), var(--end-top, 18vh), 0);
+  }
+}
+
+@keyframes ss-cursed-crow-flap {
+  0%, 100% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(0.4);
+  }
+}
+
+/* Witches. Right -> left, slower, rarer. Main element handles horizontal
+ * travel; inner element handles a gentle vertical bob. */
+.scene-switch-cursed__witch {
+  top: 0 !important;
+  left: 0 !important;
+  width: 120px !important;
+  height: 70px !important;
+  z-index: 2147481600 !important;
+  opacity: 0.88 !important;
+  animation-name: ss-cursed-witch-fly !important;
+  animation-timing-function: linear !important;
+  animation-fill-mode: forwards !important;
+  animation-iteration-count: 1 !important;
+}
+
+.scene-switch-cursed__witch > .bob {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  animation: ss-cursed-witch-bob 2.6s ease-in-out infinite !important;
+}
+
+@keyframes ss-cursed-witch-fly {
+  from {
+    transform: translate3d(calc(100vw + 160px), var(--start-top, 20vh), 0);
+  }
+  to {
+    transform: translate3d(-200px, var(--end-top, 28vh), 0);
+  }
+}
+
+@keyframes ss-cursed-witch-bob {
+  0%, 100% {
+    transform: translateY(-10px);
+  }
+  50% {
+    transform: translateY(10px);
+  }
+}
+
+/* Shadow pass. A soft darkening band that sweeps from above the viewport
+ * downward, as if something large flew over the page. */
+.scene-switch-cursed__shadow {
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  height: 55vh !important;
+  z-index: 2147481200 !important;
+  background:
+    linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0) 0%,
+      rgba(0, 0, 0, 0.45) 50%,
+      rgba(0, 0, 0, 0) 100%
+    ) !important;
+  mix-blend-mode: multiply !important;
+  animation: ss-cursed-shadow-pass 1100ms ease-in-out forwards !important;
+}
+
+@keyframes ss-cursed-shadow-pass {
+  from {
+    transform: translate3d(0, -60vh, 0);
+  }
+  to {
+    transform: translate3d(0, 110vh, 0);
+  }
+}
+
+/* Respect user accessibility settings: disable the whole motion layer so
+ * Cursed mode never forces motion onto someone who has opted out. */
+@media (prefers-reduced-motion: reduce) {
+  .scene-switch-cursed__crow,
+  .scene-switch-cursed__witch,
+  .scene-switch-cursed__shadow {
+    display: none !important;
+  }
 }
