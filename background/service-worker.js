@@ -55,6 +55,7 @@ function failResponse(reason, extras = {}) {
     ok: false,
     sceneId: extras.sceneId || null,
     reason,
+    subReason: extras.subReason || null,
     needsReload: Boolean(extras.needsReload),
   };
 }
@@ -71,13 +72,21 @@ async function resolveTabId(requested) {
 async function verifyTabSupported(tabId) {
   const tab = await chrome.tabs.get(tabId);
   if (!tab || !tab.url) {
-    return { supported: false, reason: BRIDGE_REASONS.UNSUPPORTED_PAGE };
+    return {
+      supported: false,
+      reason: BRIDGE_REASONS.UNSUPPORTED_PAGE,
+      subReason: null,
+    };
   }
   const { supported, reason } = checkUrlEligibility(tab.url);
   if (!supported) {
-    return { supported: false, reason: BRIDGE_REASONS.UNSUPPORTED_PAGE, subReason: reason };
+    return {
+      supported: false,
+      reason: BRIDGE_REASONS.UNSUPPORTED_PAGE,
+      subReason: reason,
+    };
   }
-  return { supported: true, reason: null };
+  return { supported: true, reason: null, subReason: null };
 }
 
 async function injectRuntime(tabId, sceneId) {
@@ -139,7 +148,10 @@ async function handleApplyScene({ sceneId, tabId: requestedTabId }) {
   }
   const eligibility = await verifyTabSupported(tabId);
   if (!eligibility.supported) {
-    return failResponse(BRIDGE_REASONS.UNSUPPORTED_PAGE, { sceneId });
+    return failResponse(BRIDGE_REASONS.UNSUPPORTED_PAGE, {
+      sceneId,
+      subReason: eligibility.subReason,
+    });
   }
   try {
     await injectRuntime(tabId, sceneId);
@@ -196,11 +208,19 @@ async function handleGetActiveScene({ tabId: requestedTabId }) {
   }
 }
 
+// Reload via chrome.scripting instead of chrome.tabs.reload. The scripting
+// permission is already required to inject the runtime, so we avoid asking for
+// the broader "tabs" permission just to trigger a reload from the recovery UI.
 async function handleReloadActiveTab({ tabId: requestedTabId }) {
   const tabId = await resolveTabId(requestedTabId);
   if (tabId == null) return { ok: false };
   try {
-    await chrome.tabs.reload(tabId);
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        location.reload();
+      },
+    });
     return { ok: true };
   } catch (err) {
     console.warn("[scene-switch] reload failed", err);

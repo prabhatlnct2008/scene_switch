@@ -65,6 +65,51 @@
     return false;
   }
 
+  function isElementHidden(el) {
+    if (!(el instanceof Element)) return true;
+    if (el.hasAttribute("hidden")) return true;
+    const view = el.ownerDocument && el.ownerDocument.defaultView;
+    const style = view && view.getComputedStyle ? view.getComputedStyle(el) : null;
+    if (!style) return false;
+    if (style.display === "none" || style.visibility === "hidden") return true;
+    if (parseFloat(style.opacity || "1") === 0) return true;
+    return false;
+  }
+
+  // Mirror of shared/dom.js#detectBlockingContext. Returns { blocked, reason }
+  // where reason is an UNSUPPORTED_REASONS value. Runtime.apply() calls this
+  // after URL eligibility so pages with checkout widgets, large compose
+  // surfaces, or an active textarea draft are left untouched.
+  function detectBlockingContext() {
+    if (!document || !document.body) return { blocked: false, reason: null };
+
+    if (
+      document.querySelector(
+        'input[autocomplete*="cc-number" i], input[autocomplete*="cc-csc" i], input[autocomplete*="cc-exp" i], input[autocomplete*="cc-name" i]',
+      )
+    ) {
+      return { blocked: true, reason: "sensitive_context" };
+    }
+
+    const editables = document.querySelectorAll(
+      '[contenteditable="true"], [contenteditable=""]',
+    );
+    for (const el of editables) {
+      if (isElementHidden(el)) continue;
+      const rect = el.getBoundingClientRect();
+      if (rect.width >= 240 && rect.height >= 120) {
+        return { blocked: true, reason: "sensitive_context" };
+      }
+    }
+
+    const active = document.activeElement;
+    if (active && active.tagName === "TEXTAREA" && (active.value || "").length > 40) {
+      return { blocked: true, reason: "sensitive_context" };
+    }
+
+    return { blocked: false, reason: null };
+  }
+
   function getRoot() {
     let root = document.getElementById(MARKERS.ROOT_ID);
     if (root) return root;
@@ -306,6 +351,7 @@
     appendOwnedNode,
     clearSceneActive,
     clearTouchedNodes,
+    detectBlockingContext,
     getActiveSceneId,
     getRoot,
     injectStyle,

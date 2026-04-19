@@ -241,28 +241,51 @@ function renderError() {
     createStatus({
       state: "error",
       title: ERROR_COPY.TITLE,
-      line: ERROR_COPY.BODY,
+      line: state.needsReload ? ERROR_COPY.BODY_RELOAD : ERROR_COPY.BODY,
     }),
   );
 
   const actions = document.createElement("div");
   actions.className = "popup__actions";
 
+  // When the runtime flagged needsReload, retrying in-place won't help. Make
+  // Reload the primary so the escape hatch is unambiguous.
+  const primaryIsReload = Boolean(state.needsReload);
+
   const retry = document.createElement("button");
   retry.type = "button";
-  retry.className = "popup__button popup__button--primary";
+  retry.className = primaryIsReload
+    ? "popup__button"
+    : "popup__button popup__button--primary";
   retry.textContent = ERROR_COPY.RETRY;
   retry.addEventListener("click", onRetryClick);
-  actions.appendChild(retry);
 
   const reload = document.createElement("button");
   reload.type = "button";
-  reload.className = "popup__button";
+  reload.className = primaryIsReload
+    ? "popup__button popup__button--primary"
+    : "popup__button";
   reload.textContent = ERROR_COPY.RELOAD;
   reload.addEventListener("click", onReloadClick);
-  actions.appendChild(reload);
+
+  if (primaryIsReload) {
+    actions.appendChild(reload);
+    actions.appendChild(retry);
+  } else {
+    actions.appendChild(retry);
+    actions.appendChild(reload);
+  }
 
   body.appendChild(actions);
+
+  // Secondary escape hatch: About / Settings gives the user somewhere to go
+  // when both recovery buttons feel wrong.
+  const settings = document.createElement("button");
+  settings.type = "button";
+  settings.className = "popup__text-link";
+  settings.textContent = POPUP_COPY.SETTINGS_LINK;
+  settings.addEventListener("click", openSettings);
+  body.appendChild(settings);
 }
 
 function renderLoading() {
@@ -311,6 +334,17 @@ async function onSceneClick(sceneId) {
 
   const response = await sendMessage({ type: "apply-scene", sceneId });
   if (!response || !response.ok) {
+    // Unsupported is a distinct screen with its own copy — don't drop it into
+    // the generic error recovery flow. The runtime-level DOM check can surface
+    // unsupported on a URL that looked fine pre-click.
+    if (response?.reason === "unsupported_page") {
+      setState({
+        popupState: "unsupported",
+        unsupportedReason: response?.subReason || null,
+        currentScene: null,
+      });
+      return;
+    }
     setState({
       popupState: "error",
       errorReason: response?.reason || "apply_failed",
@@ -348,10 +382,13 @@ async function onSceneClick(sceneId) {
 async function onRestoreClick() {
   const response = await sendMessage({ type: "restore-scene" });
   if (!response || !response.ok) {
+    // A failed restore almost always wants the reload escape hatch so the user
+    // is never stranded with partial state. Honor the flag the runtime sent,
+    // and default to true if the field is missing.
     setState({
       popupState: "error",
       errorReason: response?.reason || "restore_failed",
-      needsReload: Boolean(response?.needsReload),
+      needsReload: response?.needsReload !== false,
     });
     return;
   }

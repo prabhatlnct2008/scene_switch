@@ -125,3 +125,47 @@ export function collectSafeTextNodes(root = document.body, limit = THRESHOLDS.MA
   }
   return results;
 }
+
+// Second-layer eligibility check. URL eligibility catches known bad pages; this
+// catches generic pages that happen to carry sensitive widgets (checkout forms
+// on marketing sites, embedded compose surfaces, rich text editors). Returns
+// { blocked, reason } where reason maps to an UNSUPPORTED_REASONS value.
+//
+// Scoring is conservative: we'd rather over-block than damage a compose draft.
+// The content runtime ships a mirror of this function inline because injected
+// classic scripts cannot ES-import.
+export function detectBlockingContext(doc = typeof document !== "undefined" ? document : null) {
+  if (!doc || !doc.body) return { blocked: false, reason: null };
+
+  // Payment form signals: autocomplete tokens on credit-card fields are the
+  // clearest indicator a merchant is live on the page.
+  if (
+    doc.querySelector(
+      'input[autocomplete*="cc-number" i], input[autocomplete*="cc-csc" i], input[autocomplete*="cc-exp" i], input[autocomplete*="cc-name" i]',
+    )
+  ) {
+    return { blocked: true, reason: "sensitive_context" };
+  }
+
+  // Large visible contenteditable host = compose surface (Gmail body, Notion,
+  // Google-Docs-style editors, drafting UIs). We intentionally skip tiny
+  // contenteditable chips which are common on social feeds.
+  const editables = doc.querySelectorAll(
+    '[contenteditable="true"], [contenteditable=""]',
+  );
+  for (const el of editables) {
+    if (isElementHidden(el)) continue;
+    const rect = el.getBoundingClientRect();
+    if (rect.width >= 240 && rect.height >= 120) {
+      return { blocked: true, reason: "sensitive_context" };
+    }
+  }
+
+  // User is actively drafting text in a textarea — don't run over their work.
+  const active = doc.activeElement;
+  if (active && active.tagName === "TEXTAREA" && (active.value || "").length > 40) {
+    return { blocked: true, reason: "sensitive_context" };
+  }
+
+  return { blocked: false, reason: null };
+}

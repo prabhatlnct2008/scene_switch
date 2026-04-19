@@ -167,6 +167,19 @@
       return Bridge.ok({ sceneId: Engine.getActiveSceneId() });
     }
 
+    // Second-layer eligibility: URL passed, but the page carries a compose
+    // surface, payment form, or active textarea draft. Bail before touching
+    // anything so the user's work is never disturbed.
+    if (typeof Engine.detectBlockingContext === "function") {
+      const ctx = Engine.detectBlockingContext();
+      if (ctx.blocked) {
+        return Bridge.fail(Bridge.REASONS.UNSUPPORTED_PAGE, {
+          sceneId,
+          subReason: ctx.reason || null,
+        });
+      }
+    }
+
     runtimeState.isApplying = true;
     try {
       // Switching scenes: restore first so we never stack transformations.
@@ -181,9 +194,13 @@
         scene.apply();
       } catch (err) {
         console.warn("[scene-switch] scene.apply threw", err);
-        // Clean up partial state.
-        internalRestore();
-        return Bridge.fail(Bridge.REASONS.APPLY_FAILED, { sceneId });
+        // Clean up partial state. If the cleanup itself is incomplete, surface
+        // the reload fallback so the user has a sure-fire way out.
+        const cleanup = internalRestore();
+        return Bridge.fail(Bridge.REASONS.APPLY_FAILED, {
+          sceneId,
+          needsReload: !cleanup.ok,
+        });
       }
 
       Engine.markSceneActive(sceneId);

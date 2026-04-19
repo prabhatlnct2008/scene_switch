@@ -307,6 +307,25 @@ body {
   color: var(--ss-muted);
 }
 
+/* Secondary link for recovery flows (error state "About / Settings"). */
+.popup__text-link {
+  appearance: none;
+  align-self: flex-start;
+  background: transparent;
+  border: 0;
+  padding: 4px 0;
+  color: var(--ss-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.popup__text-link:hover {
+  color: var(--ss-accent);
+}
+
 /* Focus visibility for keyboard users */
 :focus-visible {
   outline: 2px solid var(--ss-focus);

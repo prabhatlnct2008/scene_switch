@@ -61,6 +61,8 @@ export function getUnsupportedCopy(reason) {
 export const ERROR_COPY = Object.freeze({
   TITLE: "Something went weird while switching this page.",
   BODY: "Try again, or reload this tab to restore everything.",
+  // Shown when the runtime reported needsReload — retrying in place won't help.
+  BODY_RELOAD: "Part of the page didn\u2019t come back cleanly. Reload this tab to finish restoring it.",
   RETRY: "Try again",
   RELOAD: "Reload tab",
 });

@@ -24,17 +24,24 @@
       ok: true,
       sceneId: payload && payload.sceneId ? payload.sceneId : null,
       reason: null,
+      subReason: null,
       needsReload: false,
     };
   }
 
+  // opts.subReason (optional) carries a more specific code alongside the
+  // top-level reason — for example, "sensitive_context" when the page carried
+  // a payment form but the top-level reason is still "unsupported_page". The
+  // popup uses it to pick the right copy variant.
   function fail(reason, opts) {
     const needsReload = Boolean(opts && opts.needsReload);
     const sceneId = opts && opts.sceneId ? opts.sceneId : null;
+    const subReason = opts && opts.subReason ? opts.subReason : null;
     return {
       ok: false,
       sceneId,
       reason: reason || REASONS.PAGE_CONTEXT_ERROR,
+      subReason,
       needsReload,
     };
   }
