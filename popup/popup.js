@@ -1,9 +1,8 @@
-// Popup shell and screen renderer (Slice 02).
+// Popup shell and screen renderer.
 //
 // Owns the popup state machine: default | applying | applied | unsupported |
-// error. Real scene application lands in Slice 03; here, scene card clicks walk
-// the state machine with a short stub so the UI shape and flow can be verified.
-// Unsupported and eligibility detection are already wired through shared/urls.
+// error. Slice 02 set up the UI shape; Slice 03 replaces the stubbed action
+// handlers with real service-worker messages.
 
 import { STORAGE_KEYS } from "../shared/constants.js";
 import {
@@ -11,7 +10,7 @@ import {
   POPUP_COPY,
   getUnsupportedCopy,
 } from "../shared/copy.js";
-import { SCENES, getSceneById } from "../shared/scene-meta.js";
+import { SCENES, getSceneById, isValidSceneId } from "../shared/scene-meta.js";
 import { getSettings, setSettings } from "../shared/storage.js";
 import { checkUrlEligibility, getActiveTabInfo } from "../shared/urls.js";
 
@@ -21,6 +20,7 @@ const state = {
   currentScene: null,
   unsupportedReason: null,
   errorReason: null,
+  needsReload: false,
   isFirstRun: false,
   lastUsedScene: null,
 };
@@ -32,6 +32,27 @@ function $(selector) {
 function setState(patch) {
   Object.assign(state, patch);
   render();
+}
+
+function sendMessage(message) {
+  return new Promise((resolve) => {
+    try {
+      chrome.runtime.sendMessage(message, (response) => {
+        if (chrome.runtime.lastError) {
+          console.warn(
+            "[scene-switch] sendMessage failed",
+            chrome.runtime.lastError,
+          );
+          resolve(null);
+          return;
+        }
+        resolve(response || null);
+      });
+    } catch (err) {
+      console.warn("[scene-switch] sendMessage threw", err);
+      resolve(null);
+    }
+  });
 }
 
 function renderStaticCopy() {
@@ -99,12 +120,13 @@ function createHint() {
   return wrap;
 }
 
-function createSceneCard(scene) {
+function createSceneCard(scene, { disabled = false } = {}) {
   const card = document.createElement("button");
   card.type = "button";
   card.className = "scene-card";
   card.setAttribute("data-scene-id", scene.id);
   card.setAttribute("aria-label", `${scene.name}. ${scene.descriptor}`);
+  if (disabled) card.disabled = true;
 
   const name = document.createElement("span");
   name.className = "scene-card__name";
@@ -281,32 +303,74 @@ function render() {
 }
 
 // --- Actions ----------------------------------------------------------------
-// In Slice 02 the action handlers walk the state machine with stubs. Slice 03
-// replaces these with real calls into the service worker orchestration layer.
 
-function onSceneClick(sceneId) {
+async function onSceneClick(sceneId) {
   if (state.popupState === "applying") return;
+  if (!isValidSceneId(sceneId)) return;
   setState({ popupState: "applying", currentScene: sceneId });
-  // Stub: resolve to applied shortly so the UX shape is testable.
-  window.setTimeout(() => {
-    if (state.popupState !== "applying") return;
-    setState({ popupState: "applied" });
-  }, 400);
+
+  const response = await sendMessage({ type: "apply-scene", sceneId });
+  if (!response || !response.ok) {
+    setState({
+      popupState: "error",
+      errorReason: response?.reason || "apply_failed",
+      needsReload: Boolean(response?.needsReload),
+    });
+    return;
+  }
+
+  try {
+    // Remember-last-used is opt-in via the rememberLastUsedScene setting. The
+    // popup init layer already honors that toggle; here we just persist the id.
+    await setSettings({ [STORAGE_KEYS.LAST_USED_SCENE]: sceneId });
+  } catch (err) {
+    console.warn("[scene-switch] failed to persist lastUsedScene", err);
+  }
+
+  setState({
+    popupState: "applied",
+    currentScene: response.sceneId || sceneId,
+    errorReason: null,
+    needsReload: false,
+    lastUsedScene: sceneId,
+  });
 }
 
-function onRestoreClick() {
-  // Stub: return to default. Slice 03 calls the real restore path.
-  setState({ popupState: "default", currentScene: null });
+async function onRestoreClick() {
+  const response = await sendMessage({ type: "restore-scene" });
+  if (!response || !response.ok) {
+    setState({
+      popupState: "error",
+      errorReason: response?.reason || "restore_failed",
+      needsReload: Boolean(response?.needsReload),
+    });
+    return;
+  }
+  setState({
+    popupState: "default",
+    currentScene: null,
+    errorReason: null,
+    needsReload: false,
+  });
 }
 
-function onRetryClick() {
-  // Stub: drop back to default. Slice 07 wires real retry.
-  setState({ popupState: "default", errorReason: null });
+async function onRetryClick() {
+  // If we were mid-apply, re-try the same scene; otherwise fall back to a
+  // fresh default render so the user can pick again.
+  if (state.currentScene && isValidSceneId(state.currentScene)) {
+    onSceneClick(state.currentScene);
+    return;
+  }
+  setState({
+    popupState: "default",
+    errorReason: null,
+    needsReload: false,
+  });
 }
 
-function onReloadClick() {
-  // Stub: drop back to default. Slice 07 wires scripted tab reload.
-  setState({ popupState: "default", errorReason: null });
+async function onReloadClick() {
+  await sendMessage({ type: "reload-active-tab" });
+  window.close();
 }
 
 async function dismissHint() {
@@ -373,6 +437,23 @@ async function init() {
       unsupportedReason: reason,
       activeTab: tab,
       isFirstRun: !firstRunHintSeen,
+      lastUsedScene: rememberLastUsed ? lastUsedScene : null,
+    });
+    return;
+  }
+
+  // Check whether a scene is already active on this tab. If so, render the
+  // applied state directly so the user can restore or switch. We avoid
+  // injecting the full runtime for this probe — the service worker reads the
+  // DOM marker directly.
+  const activeResponse = await sendMessage({ type: "get-active-scene" });
+  const activeSceneId = activeResponse?.sceneId || null;
+  if (activeSceneId && isValidSceneId(activeSceneId)) {
+    setState({
+      popupState: "applied",
+      activeTab: tab,
+      currentScene: activeSceneId,
+      isFirstRun: false, // scene is already active, hint is no longer relevant
       lastUsedScene: rememberLastUsed ? lastUsedScene : null,
     });
     return;

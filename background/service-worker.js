@@ -1,8 +1,233 @@
-// Service worker. Slice 01 only initializes storage defaults so the popup
-// never races with first-run reads. Orchestration (scripting.executeScript)
-// lands in Slice 03.
+// Service worker. Slice 03 adds the orchestration layer: receives popup
+// messages, injects the content runtime on demand, and drives apply / restore
+// via chrome.scripting.executeScript. Slice 01 still owns first-run storage
+// defaults on install/startup.
+//
+// Messages accepted (popup -> service worker):
+//   { type: "apply-scene", sceneId, tabId? }
+//   { type: "restore-scene", tabId? }
+//   { type: "get-active-scene", tabId? }
+//   { type: "reload-active-tab", tabId? }
+//
+// All responses match the structured shape from content/state-bridge.js:
+//   { ok, sceneId, reason, needsReload }
+// except get-active-scene, which returns { sceneId }.
 
 import { ensureDefaults } from "../shared/storage.js";
+import { checkUrlEligibility } from "../shared/urls.js";
+import { isValidSceneId } from "../shared/scene-meta.js";
+
+const CONTENT_FILES = [
+  "content/state-bridge.js",
+  "content/scene-engine.js",
+  "content/restore-pill.js",
+  "content/runtime.js",
+];
+
+const CONTENT_CSS_FILES = ["content/styles/restore-pill.css"];
+
+// Scenes 04-06 will add per-scene file lists here. Slice 03 relies on the
+// runtime's built-in fallback so the engine can be verified before real scenes
+// register themselves.
+const SCENE_FILES = Object.freeze({
+  // boardroom: ["content/scenes/boardroom.js"], // Slice 04
+  // melodrama: ["content/scenes/melodrama.js"], // Slice 05
+  // cursed: ["content/scenes/cursed.js"],       // Slice 06
+});
+
+const BRIDGE_REASONS = Object.freeze({
+  UNSUPPORTED_PAGE: "unsupported_page",
+  APPLY_FAILED: "apply_failed",
+  RESTORE_FAILED: "restore_failed",
+  SCENE_NOT_FOUND: "scene_not_found",
+  PAGE_CONTEXT_ERROR: "page_context_error",
+});
+
+function failResponse(reason, extras = {}) {
+  return {
+    ok: false,
+    sceneId: extras.sceneId || null,
+    reason,
+    needsReload: Boolean(extras.needsReload),
+  };
+}
+
+async function resolveTabId(requested) {
+  if (typeof requested === "number" && Number.isFinite(requested)) {
+    return requested;
+  }
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab || typeof tab.id !== "number") return null;
+  return tab.id;
+}
+
+async function verifyTabSupported(tabId) {
+  const tab = await chrome.tabs.get(tabId);
+  if (!tab || !tab.url) {
+    return { supported: false, reason: BRIDGE_REASONS.UNSUPPORTED_PAGE };
+  }
+  const { supported, reason } = checkUrlEligibility(tab.url);
+  if (!supported) {
+    return { supported: false, reason: BRIDGE_REASONS.UNSUPPORTED_PAGE, subReason: reason };
+  }
+  return { supported: true, reason: null };
+}
+
+async function injectRuntime(tabId, sceneId) {
+  const files = [...CONTENT_FILES];
+  if (sceneId && SCENE_FILES[sceneId]) {
+    files.push(...SCENE_FILES[sceneId]);
+  }
+  await chrome.scripting.executeScript({
+    target: { tabId },
+    files,
+  });
+  await chrome.scripting.insertCSS({
+    target: { tabId },
+    files: CONTENT_CSS_FILES,
+  });
+}
+
+async function callRuntime(tabId, method, args = []) {
+  const results = await chrome.scripting.executeScript({
+    target: { tabId },
+    func: (methodName, methodArgs) => {
+      const runtime = window.__SceneSwitchRuntime__;
+      if (!runtime || typeof runtime[methodName] !== "function") {
+        return {
+          ok: false,
+          sceneId: null,
+          reason: "page_context_error",
+          needsReload: true,
+        };
+      }
+      try {
+        return runtime[methodName](...methodArgs);
+      } catch (err) {
+        return {
+          ok: false,
+          sceneId: null,
+          reason: "page_context_error",
+          needsReload: true,
+        };
+      }
+    },
+    args: [method, args],
+  });
+  const first = Array.isArray(results) ? results[0] : null;
+  return first && first.result ? first.result : failResponse(BRIDGE_REASONS.PAGE_CONTEXT_ERROR);
+}
+
+async function handleApplyScene({ sceneId, tabId: requestedTabId }) {
+  if (!isValidSceneId(sceneId)) {
+    return failResponse(BRIDGE_REASONS.SCENE_NOT_FOUND, { sceneId });
+  }
+  const tabId = await resolveTabId(requestedTabId);
+  if (tabId == null) {
+    return failResponse(BRIDGE_REASONS.PAGE_CONTEXT_ERROR);
+  }
+  const eligibility = await verifyTabSupported(tabId);
+  if (!eligibility.supported) {
+    return failResponse(BRIDGE_REASONS.UNSUPPORTED_PAGE, { sceneId });
+  }
+  try {
+    await injectRuntime(tabId, sceneId);
+  } catch (err) {
+    console.warn("[scene-switch] injectRuntime failed", err);
+    return failResponse(BRIDGE_REASONS.PAGE_CONTEXT_ERROR, { sceneId });
+  }
+  try {
+    return await callRuntime(tabId, "apply", [sceneId]);
+  } catch (err) {
+    console.warn("[scene-switch] apply call failed", err);
+    return failResponse(BRIDGE_REASONS.APPLY_FAILED, { sceneId });
+  }
+}
+
+async function handleRestoreScene({ tabId: requestedTabId }) {
+  const tabId = await resolveTabId(requestedTabId);
+  if (tabId == null) {
+    return failResponse(BRIDGE_REASONS.PAGE_CONTEXT_ERROR);
+  }
+  try {
+    await injectRuntime(tabId);
+  } catch (err) {
+    console.warn("[scene-switch] injectRuntime (restore) failed", err);
+    return failResponse(BRIDGE_REASONS.RESTORE_FAILED, { needsReload: true });
+  }
+  try {
+    return await callRuntime(tabId, "restore", []);
+  } catch (err) {
+    console.warn("[scene-switch] restore call failed", err);
+    return failResponse(BRIDGE_REASONS.RESTORE_FAILED, { needsReload: true });
+  }
+}
+
+// Cheap probe that does NOT inject the runtime. Reads the DOM marker the
+// engine would have left behind. Returns { sceneId } or { sceneId: null }.
+async function handleGetActiveScene({ tabId: requestedTabId }) {
+  const tabId = await resolveTabId(requestedTabId);
+  if (tabId == null) return { sceneId: null };
+  try {
+    const results = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        const el = document.documentElement;
+        if (!el) return null;
+        return el.getAttribute("data-scene-switch-active") || null;
+      },
+    });
+    const first = Array.isArray(results) ? results[0] : null;
+    return { sceneId: first ? first.result || null : null };
+  } catch {
+    // Permission or unsupported page: silently report no active scene.
+    return { sceneId: null };
+  }
+}
+
+async function handleReloadActiveTab({ tabId: requestedTabId }) {
+  const tabId = await resolveTabId(requestedTabId);
+  if (tabId == null) return { ok: false };
+  try {
+    await chrome.tabs.reload(tabId);
+    return { ok: true };
+  } catch (err) {
+    console.warn("[scene-switch] reload failed", err);
+    return { ok: false };
+  }
+}
+
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (!message || typeof message !== "object") {
+    sendResponse(failResponse(BRIDGE_REASONS.PAGE_CONTEXT_ERROR));
+    return false;
+  }
+  let handler = null;
+  switch (message.type) {
+    case "apply-scene":
+      handler = handleApplyScene(message);
+      break;
+    case "restore-scene":
+      handler = handleRestoreScene(message);
+      break;
+    case "get-active-scene":
+      handler = handleGetActiveScene(message);
+      break;
+    case "reload-active-tab":
+      handler = handleReloadActiveTab(message);
+      break;
+    default:
+      sendResponse(failResponse(BRIDGE_REASONS.PAGE_CONTEXT_ERROR));
+      return false;
+  }
+  handler
+    .then((result) => sendResponse(result))
+    .catch((err) => {
+      console.warn("[scene-switch] handler failed", err);
+      sendResponse(failResponse(BRIDGE_REASONS.PAGE_CONTEXT_ERROR));
+    });
+  return true; // keep the channel open for async sendResponse
+});
 
 chrome.runtime.onInstalled.addListener(async () => {
   try {
