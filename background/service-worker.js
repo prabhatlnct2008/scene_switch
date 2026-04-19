@@ -31,15 +31,15 @@ const CONTENT_CSS_FILES = ["content/styles/restore-pill.css"];
 const SCENE_FILES = Object.freeze({
   boardroom: ["content/scenes/boardroom.js"],
   melodrama: ["content/scenes/melodrama.js"],
-  // cursed: ["content/scenes/cursed.js"],       // Slice 06
+  cursed: ["content/scenes/cursed.js"],
 });
 
 // Per-scene stylesheets. Inserted alongside the shared pill CSS when a scene
 // is applied; removed on restore by the engine's class toggle.
 const SCENE_CSS_FILES = Object.freeze({
   boardroom: ["content/styles/boardroom.css"],
-  // melodrama: ["content/styles/melodrama.css"], // Slice 05
-  // cursed: ["content/styles/cursed.css"],       // Slice 06
+  cursed: ["content/styles/cursed.css"],
+  // melodrama: ["content/styles/melodrama.css"], // text-only scene
 });
 
 const BRIDGE_REASONS = Object.freeze({
