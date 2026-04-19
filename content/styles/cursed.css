@@ -1,0 +1,62 @@
+/* Cursed Mode stylesheet. All rules scope to html.scene-switch-scene--cursed
+ * so they activate when the engine sets the scene class and inert-out when
+ * the class is removed on restore. No animations, no transitions, no
+ * flashing — Slice 06 acceptance requires the page to be screenshotable and
+ * accessibility-friendly.
+ */
+
+html.scene-switch-scene--cursed {
+  background-color: #0a0610 !important;
+}
+
+html.scene-switch-scene--cursed body {
+  background-color: #0d0815 !important;
+  color: #d8d2e4 !important;
+  /* Desaturate and dim the entire page for an "out of focus memory" feel.
+   * Kept conservative so text contrast stays readable. */
+  filter: saturate(0.55) brightness(0.78) hue-rotate(-12deg) !important;
+}
+
+/* Soften imagery so it reads as a fading photograph rather than ad copy. */
+html.scene-switch-scene--cursed img,
+html.scene-switch-scene--cursed picture,
+html.scene-switch-scene--cursed video {
+  filter: grayscale(0.55) brightness(0.75) contrast(0.9) !important;
+}
+
+/* Restrained crimson link tint. Visited links share the tint so the page
+ * does not telegraph history through a bright purple. */
+html.scene-switch-scene--cursed a,
+html.scene-switch-scene--cursed a:visited {
+  color: #c47474 !important;
+}
+
+/* Subtle eerie glow on headings only — keeps body copy crisp. */
+html.scene-switch-scene--cursed h1,
+html.scene-switch-scene--cursed h2,
+html.scene-switch-scene--cursed h3 {
+  text-shadow: 0 0 8px rgba(160, 60, 90, 0.35) !important;
+}
+
+/* Static vignette overlay. Pointer-events disabled so the page stays usable.
+ * mix-blend-mode: multiply darkens what is below without painting opaque
+ * black, so content remains legible through the gradient. */
+.scene-switch-cursed__vignette {
+  all: initial !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  pointer-events: none !important;
+  z-index: 2147481000 !important;
+  background:
+    radial-gradient(
+      ellipse at center,
+      rgba(0, 0, 0, 0) 40%,
+      rgba(8, 0, 16, 0.55) 78%,
+      rgba(0, 0, 0, 0.85) 100%
+    ) !important;
+  mix-blend-mode: multiply !important;
+  /* No transitions, no animations: the overlay is intentionally static. */
+}

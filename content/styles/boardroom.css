@@ -1,0 +1,106 @@
+/* Boardroom Mode stylesheet. Scoped to html.scene-switch-scene--boardroom so
+ * the rules only fire while the scene is active and unload cleanly once the
+ * engine strips the class on restore.
+ */
+
+html.scene-switch-scene--boardroom body {
+  background-color: #f1f3f7 !important;
+}
+
+/* Subdue decorative imagery so the page reads as serious work. Avoid touching
+ * scene-owned elements (ribbon/pill) and interactive media like <video>. */
+html.scene-switch-scene--boardroom img:not(#scene-switch-root img),
+html.scene-switch-scene--boardroom picture:not(#scene-switch-root picture) {
+  filter: grayscale(0.4) contrast(0.95) !important;
+}
+
+/* Flatten noisy gradients and shadows on cards/banners. */
+html.scene-switch-scene--boardroom [class*="banner"],
+html.scene-switch-scene--boardroom [class*="hero"],
+html.scene-switch-scene--boardroom [class*="promo"] {
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+/* KPI ribbon — fixed to the top, edge-to-edge, muted corporate palette.
+ * All rules are !important so a host page's CSS cannot override the reset. */
+.scene-switch-boardroom__ribbon {
+  all: initial !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 16px !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  padding: 10px 20px !important;
+  background: linear-gradient(180deg, #1f2a44 0%, #141c31 100%) !important;
+  color: #eef2f9 !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif !important;
+  font-size: 12px !important;
+  letter-spacing: 0.02em !important;
+  z-index: 2147482000 !important;
+  pointer-events: none !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.25) !important;
+}
+
+.scene-switch-boardroom__ribbon-title {
+  all: initial !important;
+  font-family: inherit !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.12em !important;
+  color: #9fb4d8 !important;
+  padding-right: 12px !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.18) !important;
+}
+
+.scene-switch-boardroom__kpis {
+  all: initial !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  list-style: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  flex-wrap: wrap !important;
+}
+
+.scene-switch-boardroom__kpi {
+  all: initial !important;
+  display: inline-flex !important;
+  align-items: baseline !important;
+  gap: 6px !important;
+  padding: 4px 10px !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 999px !important;
+  font-family: inherit !important;
+  color: #eef2f9 !important;
+}
+
+.scene-switch-boardroom__kpi-label {
+  all: initial !important;
+  font-family: inherit !important;
+  font-size: 11px !important;
+  color: #9fb4d8 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.08em !important;
+}
+
+.scene-switch-boardroom__kpi-value {
+  all: initial !important;
+  font-family: inherit !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: #ffffff !important;
+}
+
+/* Give the ribbon breathing room at the top of the page so fixed headers of
+ * the host page don't overlap it visually. */
+html.scene-switch-scene--boardroom body {
+  padding-top: 40px !important;
+}
