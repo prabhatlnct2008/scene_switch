@@ -11,7 +11,7 @@ import {
   getUnsupportedCopy,
 } from "../shared/copy.js";
 import { SCENES, getSceneById, isValidSceneId } from "../shared/scene-meta.js";
-import { getSettings, setSettings } from "../shared/storage.js";
+import { getSettings, incrementUsageCount, setSettings } from "../shared/storage.js";
 import { checkUrlEligibility, getActiveTabInfo } from "../shared/urls.js";
 
 const state = {
@@ -322,9 +322,17 @@ async function onSceneClick(sceneId) {
   try {
     // Remember-last-used is opt-in via the rememberLastUsedScene setting. The
     // popup init layer already honors that toggle; here we just persist the id.
-    await setSettings({ [STORAGE_KEYS.LAST_USED_SCENE]: sceneId });
+    // Also flip firstRunHintSeen so the onboarding nudge stops showing once
+    // the user has successfully applied at least one scene.
+    await Promise.all([
+      setSettings({
+        [STORAGE_KEYS.LAST_USED_SCENE]: sceneId,
+        [STORAGE_KEYS.FIRST_RUN_HINT_SEEN]: true,
+      }),
+      incrementUsageCount(),
+    ]);
   } catch (err) {
-    console.warn("[scene-switch] failed to persist lastUsedScene", err);
+    console.warn("[scene-switch] failed to persist post-apply settings", err);
   }
 
   setState({
@@ -333,6 +341,7 @@ async function onSceneClick(sceneId) {
     errorReason: null,
     needsReload: false,
     lastUsedScene: sceneId,
+    isFirstRun: false,
   });
 }
 

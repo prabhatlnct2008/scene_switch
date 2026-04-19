@@ -26,13 +26,20 @@ const CONTENT_FILES = [
 
 const CONTENT_CSS_FILES = ["content/styles/restore-pill.css"];
 
-// Scenes 04-06 will add per-scene file lists here. Slice 03 relies on the
-// runtime's built-in fallback so the engine can be verified before real scenes
-// register themselves.
+// Per-scene classic scripts appended after the runtime so they can call
+// __SceneSwitchRuntime__.registerScene(...) synchronously.
 const SCENE_FILES = Object.freeze({
-  // boardroom: ["content/scenes/boardroom.js"], // Slice 04
+  boardroom: ["content/scenes/boardroom.js"],
   // melodrama: ["content/scenes/melodrama.js"], // Slice 05
   // cursed: ["content/scenes/cursed.js"],       // Slice 06
+});
+
+// Per-scene stylesheets. Inserted alongside the shared pill CSS when a scene
+// is applied; removed on restore by the engine's class toggle.
+const SCENE_CSS_FILES = Object.freeze({
+  boardroom: ["content/styles/boardroom.css"],
+  // melodrama: ["content/styles/melodrama.css"], // Slice 05
+  // cursed: ["content/styles/cursed.css"],       // Slice 06
 });
 
 const BRIDGE_REASONS = Object.freeze({
@@ -82,9 +89,13 @@ async function injectRuntime(tabId, sceneId) {
     target: { tabId },
     files,
   });
+  const cssFiles = [...CONTENT_CSS_FILES];
+  if (sceneId && SCENE_CSS_FILES[sceneId]) {
+    cssFiles.push(...SCENE_CSS_FILES[sceneId]);
+  }
   await chrome.scripting.insertCSS({
     target: { tabId },
-    files: CONTENT_CSS_FILES,
+    files: cssFiles,
   });
 }
 

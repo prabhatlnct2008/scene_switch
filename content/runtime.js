@@ -132,6 +132,9 @@
           }
         }
       }
+      // Unwrap text rewrites before tearing down the rest so the page is
+      // readable even if a later step throws.
+      Engine.restoreTextNodes();
       Engine.restoreTitle();
       Engine.removeSceneStyles();
       Engine.clearTouchedNodes();
