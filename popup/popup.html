@@ -16,11 +16,22 @@
           width="24"
           height="24"
         />
-        <h1 class="popup__title">Scene Switch</h1>
+        <h1 class="popup__title" data-popup-title>Scene Switch</h1>
       </header>
-      <p class="popup__subheading">Turn this tab into something else.</p>
-      <p class="popup__note">Shell loaded. Scene picker arrives in the next slice.</p>
+      <p class="popup__subheading" data-popup-subheading>
+        Turn this tab into something else.
+      </p>
+
+      <section class="popup__status" data-popup-status aria-live="polite">
+        <p class="popup__status-line" data-popup-status-line>
+          Checking this page&hellip;
+        </p>
+      </section>
+
+      <p class="popup__trust" data-popup-trust>
+        Runs only on this page when you click. No history tracking.
+      </p>
     </main>
-    <script src="popup.js"></script>
+    <script type="module" src="popup.js"></script>
   </body>
 </html>

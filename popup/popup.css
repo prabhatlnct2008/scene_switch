@@ -51,11 +51,38 @@ body {
   color: var(--ss-muted);
 }
 
-.popup__note {
+.popup__status {
   margin: 12px 0 0;
-  padding: 8px 10px;
-  border: 1px dashed var(--ss-border);
-  border-radius: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--ss-border);
+  border-radius: 8px;
+  background: #fafafc;
+}
+
+.popup__status[data-state="unsupported"] {
+  background: #fff7ed;
+  border-color: #fbd9b1;
+}
+
+.popup__status[data-state="error"] {
+  background: #fdecec;
+  border-color: #f5b5b5;
+}
+
+.popup__status-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.popup__status-line {
+  margin: 4px 0 0;
   color: var(--ss-muted);
   font-size: 12px;
+}
+
+.popup__trust {
+  margin: 12px 0 0;
+  color: var(--ss-muted);
+  font-size: 11px;
 }

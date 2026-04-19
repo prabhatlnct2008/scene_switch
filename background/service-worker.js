@@ -1,5 +1,23 @@
-// Slice 00: minimal service worker. Orchestration and scripting calls land in later slices.
+// Service worker. Slice 01 only initializes storage defaults so the popup
+// never races with first-run reads. Orchestration (scripting.executeScript)
+// lands in Slice 03.
 
-chrome.runtime.onInstalled.addListener(() => {
-  // Intentionally empty in Slice 00. Future slices will initialize storage defaults here.
+import { ensureDefaults } from "../shared/storage.js";
+
+chrome.runtime.onInstalled.addListener(async () => {
+  try {
+    await ensureDefaults();
+  } catch (err) {
+    console.warn("[scene-switch] ensureDefaults failed", err);
+  }
+});
+
+// Chrome may wake the service worker from cold start without firing
+// onInstalled. Make sure defaults exist in that case too.
+chrome.runtime.onStartup.addListener(async () => {
+  try {
+    await ensureDefaults();
+  } catch (err) {
+    console.warn("[scene-switch] ensureDefaults (startup) failed", err);
+  }
 });
