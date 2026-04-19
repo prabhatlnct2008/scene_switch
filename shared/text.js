@@ -53,3 +53,30 @@ export function isSafeReplacement(original, replacement) {
   const growth = replacementLen / Math.max(1, originalLen);
   return growth <= 2.2;
 }
+
+// Heuristic: text looks like a short button or chip label rather than body
+// copy. Scenes use this to gate generic tone filters so paragraphs are spared.
+export function isShortLabel(value) {
+  const trimmed = normalize(value);
+  if (trimmed.length < 3 || trimmed.length > 24) return false;
+  if (/\d/.test(trimmed)) return false;
+  if (!/^[A-Za-z][A-Za-z'\- ]*$/.test(trimmed)) return false;
+  if (!/^[A-Z]/.test(trimmed)) return false;
+  const words = trimmed.split(/\s+/).filter(Boolean);
+  return words.length > 0 && words.length <= 3;
+}
+
+// Compose a sequence of transformer functions: each takes (trimmed, original)
+// and returns a replacement string or a falsy value. The composed transformer
+// returns the first non-empty string result. Used to layer an exact-phrase
+// dictionary in front of pattern-based fallbacks.
+export function composeTransformers(...transformers) {
+  return function compose(value, ...rest) {
+    for (const t of transformers) {
+      if (typeof t !== "function") continue;
+      const out = t(value, ...rest);
+      if (typeof out === "string" && out) return out;
+    }
+    return null;
+  };
+}

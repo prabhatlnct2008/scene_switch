@@ -30,7 +30,7 @@ const CONTENT_CSS_FILES = ["content/styles/restore-pill.css"];
 // __SceneSwitchRuntime__.registerScene(...) synchronously.
 const SCENE_FILES = Object.freeze({
   boardroom: ["content/scenes/boardroom.js"],
-  // melodrama: ["content/scenes/melodrama.js"], // Slice 05
+  melodrama: ["content/scenes/melodrama.js"],
   // cursed: ["content/scenes/cursed.js"],       // Slice 06
 });
 

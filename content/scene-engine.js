@@ -177,25 +177,18 @@
     });
   }
 
-  // Walk text nodes under <body>, and for each node whose trimmed text exactly
-  // matches a dictionary entry (case-insensitive), replace the text node with a
-  // <span data-scene-switch-original-text="..."> holding the replacement. The
-  // span preserves original surrounding whitespace so layout stays stable.
-  //
-  // `dictionary` is either a plain object or a Map of original -> replacement.
+  // Walk text nodes under <body> and call `transformer(trimmed, original)` for
+  // each candidate. The transformer returns a replacement string or a falsy
+  // value to skip. Layout-safety rules apply to all callers:
+  //   - skip text whose parent (or any ancestor) is unsafe
+  //   - skip already-wrapped text
+  //   - skip text outside [minLen, maxLen]
+  //   - skip replacements whose growth ratio exceeds growthFactor
+  //   - cap the number of nodes considered per pass
   // Returns the count of replacements performed.
-  function rewriteTextNodes(dictionary, options) {
+  function transformTextNodes(transformer, options) {
+    if (typeof transformer !== "function") return 0;
     const config = Object.assign({}, TEXT_REWRITE_DEFAULTS, options || {});
-    const map = new Map();
-    const entries =
-      dictionary instanceof Map
-        ? dictionary.entries()
-        : Object.entries(dictionary || {});
-    for (const [k, v] of entries) {
-      if (typeof k !== "string" || typeof v !== "string") continue;
-      map.set(k.trim().toLowerCase(), v);
-    }
-    if (map.size === 0) return 0;
     if (!document.body) return 0;
 
     const walker = document.createTreeWalker(
@@ -209,7 +202,6 @@
             return NodeFilter.FILTER_REJECT;
           }
           if (hasUnsafeAncestor(node)) return NodeFilter.FILTER_REJECT;
-          // Skip text we already wrapped.
           if (parent.hasAttribute(MARKERS.DATA_ORIGINAL_TEXT)) {
             return NodeFilter.FILTER_REJECT;
           }
@@ -217,9 +209,6 @@
           const trimmed = value.trim();
           if (trimmed.length < config.minLen) return NodeFilter.FILTER_REJECT;
           if (trimmed.length > config.maxLen) return NodeFilter.FILTER_REJECT;
-          if (!map.has(trimmed.toLowerCase())) {
-            return NodeFilter.FILTER_REJECT;
-          }
           return NodeFilter.FILTER_ACCEPT;
         },
       },
@@ -237,10 +226,18 @@
       const original = node.nodeValue || "";
       const trimmed = original.trim();
       if (!trimmed) continue;
-      const replacement = map.get(trimmed.toLowerCase());
-      if (!replacement) continue;
+      let replacement;
+      try {
+        replacement = transformer(trimmed, original);
+      } catch (err) {
+        console.warn("[scene-switch] transformer threw", err);
+        continue;
+      }
+      if (typeof replacement !== "string" || !replacement) continue;
+      if (replacement === trimmed) continue;
       const growth = replacement.length / Math.max(1, trimmed.length);
       if (growth > config.growthFactor) continue;
+      if (replacement.length > config.maxLen) continue;
       const firstCharIndex = original.indexOf(trimmed[0]);
       const leading = firstCharIndex >= 0 ? original.slice(0, firstCharIndex) : "";
       const trailing = original.slice(leading.length + trimmed.length);
@@ -255,6 +252,26 @@
       }
     }
     return changed;
+  }
+
+  // Convenience wrapper for the common "exact dictionary" case. Builds a
+  // case-insensitive lookup over the dictionary entries and delegates to
+  // transformTextNodes. `dictionary` is a plain object or Map of from->to.
+  function rewriteTextNodes(dictionary, options) {
+    const map = new Map();
+    const entries =
+      dictionary instanceof Map
+        ? dictionary.entries()
+        : Object.entries(dictionary || {});
+    for (const [k, v] of entries) {
+      if (typeof k !== "string" || typeof v !== "string") continue;
+      map.set(k.trim().toLowerCase(), v);
+    }
+    if (map.size === 0) return 0;
+    return transformTextNodes(
+      (trimmed) => map.get(trimmed.toLowerCase()) || null,
+      options,
+    );
   }
 
   function restoreTextNodes() {
@@ -301,5 +318,6 @@
     rewriteTextNodes,
     saveTitle,
     setTitle,
+    transformTextNodes,
   });
 })();
