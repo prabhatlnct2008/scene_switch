@@ -42,6 +42,7 @@ const state = {
   usageCount: 0,
   supportPromptsEnabled: true,
   supportPromptCooldownUntil: 0,
+  rememberLastUsed: true,
 };
 
 function $(selector) {
@@ -452,15 +453,15 @@ async function onSceneClick(sceneId) {
   }
 
   try {
-    // Remember-last-used is opt-in via the rememberLastUsedScene setting. The
-    // popup init layer already honors that toggle; here we just persist the id.
-    // Also flip firstRunHintSeen so the onboarding nudge stops showing once
-    // the user has successfully applied at least one scene.
+    // Respect rememberLastUsedScene: only persist the scene id when the user
+    // has opted in. Either way, flip firstRunHintSeen so the onboarding nudge
+    // stops showing once the user has successfully applied at least one scene.
+    const patch = { [STORAGE_KEYS.FIRST_RUN_HINT_SEEN]: true };
+    if (state.rememberLastUsed) {
+      patch[STORAGE_KEYS.LAST_USED_SCENE] = sceneId;
+    }
     const [, nextUsage] = await Promise.all([
-      setSettings({
-        [STORAGE_KEYS.LAST_USED_SCENE]: sceneId,
-        [STORAGE_KEYS.FIRST_RUN_HINT_SEEN]: true,
-      }),
+      setSettings(patch),
       incrementUsageCount(),
     ]);
     if (typeof nextUsage === "number") {
@@ -634,7 +635,8 @@ async function init() {
     settings?.[STORAGE_KEYS.FIRST_RUN_HINT_SEEN] === true;
   const lastUsedScene = settings?.[STORAGE_KEYS.LAST_USED_SCENE] || null;
   const rememberLastUsed =
-    settings?.[STORAGE_KEYS.REMEMBER_LAST_USED_SCENE] === true;
+    settings?.[STORAGE_KEYS.REMEMBER_LAST_USED_SCENE] !== false;
+  state.rememberLastUsed = rememberLastUsed;
 
   // Seed support-card inputs from the stored settings, then compute the
   // initial eligibility. `supportExpanded` stays false; the card only

@@ -95,7 +95,56 @@ export const ABOUT_COPY = Object.freeze({
   SUPPORTED_TITLE: "Supported pages",
   SUPPORTED_BODY:
     "Works on normal websites \u2014 articles, shopping, social feeds, wikis, and video pages.",
+  SUPPORTED_EXAMPLES: [
+    "News articles and blogs",
+    "Shopping product pages",
+    "Social feeds (Reddit, Twitter/X)",
+    "Wikipedia and other wikis",
+    "Video pages (YouTube)",
+  ],
   UNSUPPORTED_TITLE: "Blocked pages",
   UNSUPPORTED_BODY:
     "Skipped by design: chrome:// pages, the Chrome Web Store, email (Gmail), editors (Docs/Sheets/Slides), and obvious checkout pages.",
+  UNSUPPORTED_EXAMPLES: [
+    "chrome:// and browser internal pages",
+    "Chrome Web Store",
+    "Email (Gmail, Outlook)",
+    "Editors (Docs, Sheets, Slides)",
+    "Banking and checkout pages",
+  ],
+});
+
+export const OPTIONS_COPY = Object.freeze({
+  PAGE_TITLE: "Scene Switch",
+  SECTIONS: Object.freeze({
+    ABOUT: "About",
+    SUPPORTED: "Supported pages",
+    UNSUPPORTED: "Blocked pages",
+    PRIVACY: "Privacy",
+    SETTINGS: "Settings",
+    SUPPORT: "Support the creator",
+  }),
+  CONTROLS: Object.freeze({
+    SUPPORT_PROMPTS_LABEL: "Show support prompts",
+    SUPPORT_PROMPTS_HELP:
+      "When on, an inline support card may appear after you\u2019ve used Scene Switch a few times. Turn off to hide it permanently.",
+    REMEMBER_LABEL: "Remember last used scene",
+    REMEMBER_HELP:
+      "Highlights the scene you used most recently so it\u2019s easier to pick again.",
+    PILL_LABEL: "Show on-page restore pill",
+    PILL_HELP:
+      "Displays a small \u201cRestore\u201d button on the page while a scene is active. Turn off to hide it.",
+  }),
+  RESET: Object.freeze({
+    TITLE: "Reset local data",
+    HELP:
+      "Clears Scene Switch settings and counters from this browser. Does not touch any websites.",
+    BUTTON: "Reset",
+    CONFIRM:
+      "This clears all Scene Switch settings and counters from this browser. Continue?",
+    SUCCESS: "Local data was reset.",
+  }),
+  VERSION_LABEL: "Version",
+  SUPPORT_THANKS:
+    "Thanks for trying Scene Switch. If it made your tab better, consider chipping in below \u2014 it directly funds the next scene.",
 });

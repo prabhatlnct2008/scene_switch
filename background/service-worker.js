@@ -13,7 +13,8 @@
 //   { ok, sceneId, reason, needsReload }
 // except get-active-scene, which returns { sceneId }.
 
-import { ensureDefaults } from "../shared/storage.js";
+import { ensureDefaults, getSettings } from "../shared/storage.js";
+import { STORAGE_KEYS } from "../shared/constants.js";
 import { checkUrlEligibility } from "../shared/urls.js";
 import { isValidSceneId } from "../shared/scene-meta.js";
 
@@ -159,8 +160,20 @@ async function handleApplyScene({ sceneId, tabId: requestedTabId }) {
     console.warn("[scene-switch] injectRuntime failed", err);
     return failResponse(BRIDGE_REASONS.PAGE_CONTEXT_ERROR, { sceneId });
   }
+  // Read settings fresh so each apply reflects the current toggles. The
+  // runtime accepts an options bag as its second arg and today uses
+  // `showRestorePill` to decide whether to mount the on-page pill.
+  let applyOptions = { showRestorePill: true };
   try {
-    return await callRuntime(tabId, "apply", [sceneId]);
+    const settings = await getSettings();
+    applyOptions = {
+      showRestorePill: settings[STORAGE_KEYS.SHOW_RESTORE_PILL] !== false,
+    };
+  } catch (err) {
+    console.warn("[scene-switch] settings lookup failed; using defaults", err);
+  }
+  try {
+    return await callRuntime(tabId, "apply", [sceneId, applyOptions]);
   } catch (err) {
     console.warn("[scene-switch] apply call failed", err);
     return failResponse(BRIDGE_REASONS.APPLY_FAILED, { sceneId });

@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Scene Switch — Settings</title>
+    <title>Scene Switch &mdash; Settings</title>
     <link rel="stylesheet" href="options.css" />
   </head>
   <body>
@@ -16,32 +16,98 @@
           width="32"
           height="32"
         />
-        <h1 class="options__title">Scene Switch</h1>
-      </header>
-      <section class="options__section">
-        <h2>About</h2>
-        <p>
-          Scene Switch transforms the current page into playful themed scenes.
-          It runs only when you click it on a page.
-        </p>
-      </section>
-      <section class="options__section">
-        <h2>Settings</h2>
-        <div class="options__row">
-          <label class="options__toggle">
-            <input
-              type="checkbox"
-              data-support-prompts-toggle
-              aria-describedby="support-prompts-help"
-            />
-            <span class="options__toggle-label">Show support prompts</span>
-          </label>
-          <p class="options__help" id="support-prompts-help">
-            When on, Scene Switch may show an inline support card after
-            you&rsquo;ve used the extension a few times. Turn off to hide it
-            permanently.
+        <div class="options__heading">
+          <h1 class="options__title" data-options-title>Scene Switch</h1>
+          <p class="options__version">
+            <span data-version-label>Version</span>
+            <span data-version-value>&nbsp;</span>
           </p>
         </div>
+      </header>
+
+      <section class="options__section">
+        <h2 data-section="about">About</h2>
+        <p data-about-body></p>
+      </section>
+
+      <section class="options__section">
+        <h2 data-section="supported">Supported pages</h2>
+        <p data-supported-body></p>
+        <ul class="options__list" data-supported-examples></ul>
+      </section>
+
+      <section class="options__section">
+        <h2 data-section="unsupported">Blocked pages</h2>
+        <p data-unsupported-body></p>
+        <ul class="options__list" data-unsupported-examples></ul>
+      </section>
+
+      <section class="options__section">
+        <h2 data-section="privacy">Privacy</h2>
+        <ul class="options__list options__list--privacy" data-privacy-body></ul>
+      </section>
+
+      <section class="options__section">
+        <h2 data-section="settings">Settings</h2>
+
+        <div class="options__row">
+          <label class="options__toggle">
+            <input type="checkbox" data-toggle-support-prompts />
+            <span class="options__toggle-label" data-label-support-prompts>
+              Show support prompts
+            </span>
+          </label>
+          <p class="options__help" data-help-support-prompts></p>
+        </div>
+
+        <div class="options__row">
+          <label class="options__toggle">
+            <input type="checkbox" data-toggle-remember-scene />
+            <span class="options__toggle-label" data-label-remember-scene>
+              Remember last used scene
+            </span>
+          </label>
+          <p class="options__help" data-help-remember-scene></p>
+        </div>
+
+        <div class="options__row">
+          <label class="options__toggle">
+            <input type="checkbox" data-toggle-restore-pill />
+            <span class="options__toggle-label" data-label-restore-pill>
+              Show on-page restore pill
+            </span>
+          </label>
+          <p class="options__help" data-help-restore-pill></p>
+        </div>
+
+        <div class="options__row options__row--reset">
+          <p class="options__toggle-label" data-reset-title>
+            Reset local data
+          </p>
+          <p class="options__help" data-reset-help></p>
+          <div class="options__reset-actions">
+            <button
+              type="button"
+              class="options__button options__button--danger"
+              data-reset-button
+            >
+              Reset
+            </button>
+            <span
+              class="options__status"
+              data-reset-status
+              role="status"
+              aria-live="polite"
+            ></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="options__section">
+        <h2 data-section="support">Support the creator</h2>
+        <p class="options__founder" data-support-founder></p>
+        <p data-support-thanks></p>
+        <div class="options__support-amounts" data-support-buttons></div>
       </section>
     </main>
     <script type="module" src="options.js"></script>

@@ -157,10 +157,15 @@
     }
   }
 
-  function apply(sceneId) {
+  function apply(sceneId, options) {
     if (typeof sceneId !== "string" || !sceneId) {
       return Bridge.fail(Bridge.REASONS.SCENE_NOT_FOUND);
     }
+    // Options come from the service worker after a fresh settings read.
+    // Only `showRestorePill` is consumed today; default to true so missing
+    // flags never accidentally hide the user's restore affordance.
+    const showRestorePill =
+      !options || options.showRestorePill !== false;
     if (runtimeState.isApplying) {
       // Defensive: the popup already guards against rapid clicks. Returning a
       // harmless ok here avoids double-applying.
@@ -204,12 +209,14 @@
       }
 
       Engine.markSceneActive(sceneId);
-      Pill.mount({
-        label: labelFor(sceneId),
-        onRestore() {
-          internalRestore();
-        },
-      });
+      if (showRestorePill) {
+        Pill.mount({
+          label: labelFor(sceneId),
+          onRestore() {
+            internalRestore();
+          },
+        });
+      }
       return Bridge.ok({ sceneId });
     } finally {
       runtimeState.isApplying = false;
