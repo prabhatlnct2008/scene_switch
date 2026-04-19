@@ -4,14 +4,22 @@
 // error. Slice 02 set up the UI shape; Slice 03 replaces the stubbed action
 // handlers with real service-worker messages.
 
-import { STORAGE_KEYS } from "../shared/constants.js";
+import { PAYPAL, STORAGE_KEYS, buildPaypalUrl } from "../shared/constants.js";
 import {
   ERROR_COPY,
   POPUP_COPY,
+  SUPPORT_COPY,
   getUnsupportedCopy,
 } from "../shared/copy.js";
 import { SCENES, getSceneById, isValidSceneId } from "../shared/scene-meta.js";
-import { getSettings, incrementUsageCount, setSettings } from "../shared/storage.js";
+import {
+  disableSupportPrompts,
+  getSettings,
+  incrementUsageCount,
+  isSupportPromptEligible,
+  setSettings,
+  snoozeSupportPrompts,
+} from "../shared/storage.js";
 import { checkUrlEligibility, getActiveTabInfo } from "../shared/urls.js";
 
 const state = {
@@ -23,6 +31,17 @@ const state = {
   needsReload: false,
   isFirstRun: false,
   lastUsedScene: null,
+  // Support card inputs. `supportEligible` is the result of the three-gate
+  // check (usage/enabled/cooldown). `supportExpanded` means "render the card
+  // right now" — true when eligibility fires automatically, or when the user
+  // opens the footer manually. `supportDismissedThisSession` suppresses the
+  // card after Not now / Hide so one popup session stays calm.
+  supportEligible: false,
+  supportExpanded: false,
+  supportDismissedThisSession: false,
+  usageCount: 0,
+  supportPromptsEnabled: true,
+  supportPromptCooldownUntil: 0,
 };
 
 function $(selector) {
@@ -164,6 +183,8 @@ function renderDefault() {
     scenes.appendChild(createSceneCard(scene));
   }
   body.appendChild(scenes);
+
+  maybeAppendSupportCard(body);
 }
 
 function renderApplying() {
@@ -217,6 +238,8 @@ function renderApplied() {
     scenes.appendChild(createSceneCard(other));
   }
   body.appendChild(scenes);
+
+  maybeAppendSupportCard(body);
 }
 
 function renderUnsupported() {
@@ -286,6 +309,81 @@ function renderError() {
   settings.textContent = POPUP_COPY.SETTINGS_LINK;
   settings.addEventListener("click", openSettings);
   body.appendChild(settings);
+}
+
+function shouldShowSupportCard() {
+  if (state.supportDismissedThisSession) return false;
+  if (state.supportExpanded) return true;
+  return state.supportEligible;
+}
+
+function maybeAppendSupportCard(body) {
+  if (!shouldShowSupportCard()) return;
+  body.appendChild(createSupportCard());
+}
+
+function createSupportCard() {
+  const card = document.createElement("section");
+  card.className = "popup__support";
+  card.setAttribute("aria-label", SUPPORT_COPY.CARD_TITLE);
+
+  const title = document.createElement("p");
+  title.className = "popup__support-title";
+  title.textContent = SUPPORT_COPY.CARD_TITLE;
+  card.appendChild(title);
+
+  const body = document.createElement("p");
+  body.className = "popup__support-body";
+  body.textContent = SUPPORT_COPY.CARD_BODY;
+  card.appendChild(body);
+
+  const amountButtons = document.createElement("div");
+  amountButtons.className = "popup__support-amounts";
+  const amountSpecs = [
+    { label: SUPPORT_COPY.BUTTONS.COFFEE, amount: PAYPAL.AMOUNTS.COFFEE },
+    {
+      label: SUPPORT_COPY.BUTTONS.DOUBLE_COFFEE,
+      amount: PAYPAL.AMOUNTS.DOUBLE_COFFEE,
+    },
+    {
+      label: SUPPORT_COPY.BUTTONS.SPONSOR_CHAOS,
+      amount: PAYPAL.AMOUNTS.SPONSOR_CHAOS,
+    },
+  ];
+  for (const spec of amountSpecs) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "popup__button popup__button--primary popup__support-amount";
+    btn.textContent = spec.label;
+    btn.addEventListener("click", () => onSupportAmountClick(spec.amount));
+    amountButtons.appendChild(btn);
+  }
+  card.appendChild(amountButtons);
+
+  const founder = document.createElement("p");
+  founder.className = "popup__support-founder";
+  founder.textContent = SUPPORT_COPY.FOUNDER_NOTE;
+  card.appendChild(founder);
+
+  const secondary = document.createElement("div");
+  secondary.className = "popup__support-secondary";
+
+  const dismiss = document.createElement("button");
+  dismiss.type = "button";
+  dismiss.className = "popup__text-link";
+  dismiss.textContent = SUPPORT_COPY.DISMISS;
+  dismiss.addEventListener("click", onSupportDismiss);
+  secondary.appendChild(dismiss);
+
+  const hide = document.createElement("button");
+  hide.type = "button";
+  hide.className = "popup__text-link";
+  hide.textContent = SUPPORT_COPY.HIDE;
+  hide.addEventListener("click", onSupportHide);
+  secondary.appendChild(hide);
+
+  card.appendChild(secondary);
+  return card;
 }
 
 function renderLoading() {
@@ -358,16 +456,23 @@ async function onSceneClick(sceneId) {
     // popup init layer already honors that toggle; here we just persist the id.
     // Also flip firstRunHintSeen so the onboarding nudge stops showing once
     // the user has successfully applied at least one scene.
-    await Promise.all([
+    const [, nextUsage] = await Promise.all([
       setSettings({
         [STORAGE_KEYS.LAST_USED_SCENE]: sceneId,
         [STORAGE_KEYS.FIRST_RUN_HINT_SEEN]: true,
       }),
       incrementUsageCount(),
     ]);
+    if (typeof nextUsage === "number") {
+      state.usageCount = nextUsage;
+    }
   } catch (err) {
     console.warn("[scene-switch] failed to persist post-apply settings", err);
   }
+
+  // Usage just ticked up; the card may now be eligible. Only auto-expand when
+  // the user hasn't already dismissed it this popup session.
+  recomputeSupportEligibility();
 
   setState({
     popupState: "applied",
@@ -429,8 +534,74 @@ async function dismissHint() {
 }
 
 function openSupport() {
-  // Use PAYPAL constants in Slice 08. Here we only confirm the click path.
-  console.debug("[scene-switch] support footer clicked (wired in Slice 08)");
+  // The footer link is always visible; clicking it forces the expanded card
+  // open even when the eligibility gate hasn't fired yet. This is the
+  // "user-initiated" path the PRD calls out.
+  setState({
+    supportExpanded: true,
+    supportDismissedThisSession: false,
+  });
+}
+
+function openPaypalUrl(amount) {
+  const url = buildPaypalUrl(amount);
+  try {
+    // chrome.tabs.create opens a new tab without requiring the "tabs"
+    // permission. Fall back to window.open if the API is unavailable.
+    if (chrome.tabs && typeof chrome.tabs.create === "function") {
+      chrome.tabs.create({ url, active: true });
+    } else {
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
+  } catch (err) {
+    console.warn("[scene-switch] failed to open PayPal url", err);
+  }
+}
+
+function onSupportAmountClick(amount) {
+  openPaypalUrl(amount);
+  // Close the popup after sending the user to PayPal so they aren't left
+  // staring at stale UI. The open tab is their new focus.
+  window.close();
+}
+
+async function onSupportDismiss() {
+  setState({
+    supportDismissedThisSession: true,
+    supportExpanded: false,
+    supportEligible: false,
+  });
+  try {
+    const until = await snoozeSupportPrompts();
+    state.supportPromptCooldownUntil = until;
+  } catch (err) {
+    console.warn("[scene-switch] snoozeSupportPrompts failed", err);
+  }
+}
+
+async function onSupportHide() {
+  setState({
+    supportDismissedThisSession: true,
+    supportExpanded: false,
+    supportEligible: false,
+    supportPromptsEnabled: false,
+  });
+  try {
+    await disableSupportPrompts();
+  } catch (err) {
+    console.warn("[scene-switch] disableSupportPrompts failed", err);
+  }
+}
+
+function recomputeSupportEligibility() {
+  const eligible = isSupportPromptEligible({
+    [STORAGE_KEYS.USAGE_COUNT]: state.usageCount,
+    [STORAGE_KEYS.SUPPORT_PROMPTS_ENABLED]: state.supportPromptsEnabled,
+    [STORAGE_KEYS.SUPPORT_PROMPT_COOLDOWN_UNTIL]:
+      state.supportPromptCooldownUntil,
+  });
+  state.supportEligible = eligible;
+  return eligible;
 }
 
 function openSettings() {
@@ -464,6 +635,16 @@ async function init() {
   const lastUsedScene = settings?.[STORAGE_KEYS.LAST_USED_SCENE] || null;
   const rememberLastUsed =
     settings?.[STORAGE_KEYS.REMEMBER_LAST_USED_SCENE] === true;
+
+  // Seed support-card inputs from the stored settings, then compute the
+  // initial eligibility. `supportExpanded` stays false; the card only
+  // auto-renders when eligibility is true.
+  state.usageCount = Number(settings?.[STORAGE_KEYS.USAGE_COUNT]) || 0;
+  state.supportPromptsEnabled =
+    settings?.[STORAGE_KEYS.SUPPORT_PROMPTS_ENABLED] !== false;
+  state.supportPromptCooldownUntil =
+    Number(settings?.[STORAGE_KEYS.SUPPORT_PROMPT_COOLDOWN_UNTIL]) || 0;
+  recomputeSupportEligibility();
 
   if (!tab || !tab.url) {
     setState({

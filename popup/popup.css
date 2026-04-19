@@ -326,6 +326,58 @@ body {
   color: var(--ss-accent);
 }
 
+/* Support / Buy-me-a-coffee card (Slice 08). Appears inline below the scene
+   cards or applied-state actions so it never hides the primary controls. */
+.popup__support {
+  margin-top: 6px;
+  padding: 12px;
+  background: var(--ss-surface);
+  border: 1px solid var(--ss-border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.popup__support-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.popup__support-body {
+  margin: 0;
+  color: var(--ss-muted);
+  font-size: 12px;
+}
+
+.popup__support-amounts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.popup__support-amount {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.popup__support-founder {
+  margin: 0;
+  color: var(--ss-muted);
+  font-size: 11px;
+  font-style: italic;
+}
+
+.popup__support-secondary {
+  display: flex;
+  gap: 12px;
+}
+
+.popup__support-secondary .popup__text-link {
+  align-self: auto;
+}
+
 /* Focus visibility for keyboard users */
 :focus-visible {
   outline: 2px solid var(--ss-focus);

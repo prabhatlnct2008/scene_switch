@@ -62,3 +62,33 @@ body {
 .options__muted {
   color: var(--ss-muted);
 }
+
+.options__row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.options__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.options__toggle input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.options__toggle-label {
+  font-weight: 500;
+}
+
+.options__help {
+  margin: 0;
+  color: var(--ss-muted);
+  font-size: 12px;
+}

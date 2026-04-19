@@ -2,7 +2,7 @@
 // first-run reads never return undefined. Everything persisted here is settings
 // and counters; no URLs, page text, or personal data are stored.
 
-import { STORAGE_DEFAULTS, STORAGE_KEYS } from "./constants.js";
+import { STORAGE_DEFAULTS, STORAGE_KEYS, THRESHOLDS } from "./constants.js";
 
 const STORAGE_KEY_LIST = Object.values(STORAGE_KEYS);
 
@@ -49,6 +49,32 @@ export async function resetLocalData() {
   // Only remove keys this extension owns. Leaves any unrelated keys alone in
   // case future slices or other tools share chrome.storage.local.
   await chrome.storage.local.remove(STORAGE_KEY_LIST);
+}
+
+export async function snoozeSupportPrompts(cooldownMs = THRESHOLDS.SUPPORT_COOLDOWN_MS) {
+  const until = Date.now() + cooldownMs;
+  await chrome.storage.local.set({
+    [STORAGE_KEYS.SUPPORT_PROMPT_COOLDOWN_UNTIL]: until,
+  });
+  return until;
+}
+
+export async function disableSupportPrompts() {
+  await chrome.storage.local.set({
+    [STORAGE_KEYS.SUPPORT_PROMPTS_ENABLED]: false,
+  });
+}
+
+export function isSupportPromptEligible(settings, now = Date.now()) {
+  if (!settings || typeof settings !== "object") return false;
+  const usage = settings[STORAGE_KEYS.USAGE_COUNT];
+  if (typeof usage !== "number" || usage < THRESHOLDS.SUPPORT_USAGE_THRESHOLD) {
+    return false;
+  }
+  if (settings[STORAGE_KEYS.SUPPORT_PROMPTS_ENABLED] !== true) return false;
+  const cooldownUntil = settings[STORAGE_KEYS.SUPPORT_PROMPT_COOLDOWN_UNTIL];
+  if (typeof cooldownUntil === "number" && now <= cooldownUntil) return false;
+  return true;
 }
 
 export async function ensureDefaults() {
